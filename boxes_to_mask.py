@@ -3,7 +3,6 @@ import json
 import argparse
 import numpy as np
 import cv2
-import threading
 import concurrent.futures
 
 #These are hardcoded in as they are not included in the project JSON and they are constant for all images.
@@ -23,21 +22,19 @@ label_colours = {
     "0": [0,0,0]
 }
 
-class MaskCreator(threading.Thread):
-    def __init__(self,image,path):
-        threading.Thread.__init__(self)
-        self.image = image
-        self.output_path = path
-
-    def run(self):
-        print("thread started")
-        create_mask_for_image(self.image,self.output_path)
-
 def create_mask_for_image(image,path):
     filename = image["filename"][:-4] #Remove extension
     print(f"Creating mask for: {filename}")
+    regions = extract_regions_from_json(image)
+    paths = regions_to_paths(regions)
+    mask = create_mask(paths)
+    output_file = f"{path}/{filename}_mask.png"
+    cv2.imwrite(output_file,mask)
+    print(f"Mask created and written to {output_file}")
+
+def extract_regions_from_json(image_json):
     regions = {}
-    for region in image["regions"]: 
+    for region in image_json["regions"]: 
         label = region["region_attributes"]["class"]
         xs =region["shape_attributes"]["all_points_x"]
         ys = region["shape_attributes"]["all_points_y"]
@@ -46,9 +43,7 @@ def create_mask_for_image(image,path):
             regions[label].append(points)
         else:
             regions[label] = [points]
-    paths = regions_to_paths(regions)
-
-    cv2.imwrite(f"{path}/{filename}_mask.png",create_mask(paths))
+    return regions
 
 def create_mask(paths):
     mask = np.zeros((IMAGE_HEIGHT,IMAGE_WIDTH,3),dtype=np.int64)
@@ -90,7 +85,3 @@ if __name__=="__main__":
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.max_threads) as thread_pool:
         thread_pool.map(lambda x:create_mask_for_image(x,args.file_path),project["_via_img_metadata"].values())
-
-    # for image in project["_via_img_metadata"].values():
-    #     creator = MaskCreator(image,args.file_path)
-    #     creator.start()
