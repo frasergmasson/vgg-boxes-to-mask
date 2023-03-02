@@ -3,6 +3,7 @@ import json
 import argparse
 import numpy as np
 import cv2
+import threading
 
 #These are hardcoded in as they are not included in the project JSON and they are constant for all images.
 IMAGE_WIDTH = 4000
@@ -20,6 +21,33 @@ label_colours = {
     "growlers": [0,0,255],
     "0": [0,0,0]
 }
+
+class MaskCreator(threading.Thread):
+    def __init__(self,image,path):
+        threading.Thread.__init__(self)
+        self.image = image
+        self.output_path = path
+
+    def run(self):
+        print("thread started")
+        create_mask_for_image(self.image,self.output_path)
+
+def create_mask_for_image(image,path):
+    regions = {}
+    for region in image["regions"]: 
+        label = region["region_attributes"]["class"]
+        xs =region["shape_attributes"]["all_points_x"]
+        ys = region["shape_attributes"]["all_points_y"]
+        points = np.array([[x,y] for x,y in zip(xs,ys)])
+        if label in regions:
+            regions[label].append(points)
+        else:
+            regions[label] = [points]
+    paths = regions_to_paths(regions)
+
+    filename = image["filename"][:-4] #Remove extension
+
+    cv2.imwrite(f"{path}/{filename}_mask.png",create_mask(paths))
 
 def create_mask(paths):
     mask = np.zeros((IMAGE_HEIGHT,IMAGE_WIDTH,3),dtype=np.int64)
@@ -59,18 +87,5 @@ if __name__=="__main__":
     f.close()
 
     for image in project["_via_img_metadata"].values():
-        regions = {}
-        for region in image["regions"]: 
-            label = region["region_attributes"]["class"]
-            xs =region["shape_attributes"]["all_points_x"]
-            ys = region["shape_attributes"]["all_points_y"]
-            points = np.array([[x,y] for x,y in zip(xs,ys)])
-            if label in regions:
-                regions[label].append(points)
-            else:
-                regions[label] = [points]
-        paths = regions_to_paths(regions)
-
-        filename = image["filename"][:-4] #Remove extension
-
-        cv2.imwrite(f"{args.file_path}/{filename}_mask.png",create_mask(paths))
+        creator = MaskCreator(image,args.file_path)
+        creator.start()
