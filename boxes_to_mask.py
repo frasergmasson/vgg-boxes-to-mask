@@ -4,10 +4,11 @@ import argparse
 import numpy as np
 import cv2
 import threading
+import concurrent.futures
 
 #These are hardcoded in as they are not included in the project JSON and they are constant for all images.
-IMAGE_WIDTH = 4000
-IMAGE_HEIGHT = 2448
+IMAGE_WIDTH = 400#0
+IMAGE_HEIGHT = 244#8
 
 label_order = [
     "growlers",
@@ -33,6 +34,8 @@ class MaskCreator(threading.Thread):
         create_mask_for_image(self.image,self.output_path)
 
 def create_mask_for_image(image,path):
+    filename = image["filename"][:-4] #Remove extension
+    print(f"Creating mask for: {filename}")
     regions = {}
     for region in image["regions"]: 
         label = region["region_attributes"]["class"]
@@ -44,8 +47,6 @@ def create_mask_for_image(image,path):
         else:
             regions[label] = [points]
     paths = regions_to_paths(regions)
-
-    filename = image["filename"][:-4] #Remove extension
 
     cv2.imwrite(f"{path}/{filename}_mask.png",create_mask(paths))
 
@@ -80,12 +81,16 @@ if __name__=="__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('json_file')
     parser.add_argument('file_path')
+    parser.add_argument('-t','--max-threads',type=int,default=1)
     args = parser.parse_args()
 
     f = open(args.json_file)
     project = json.load(f)
     f.close()
 
-    for image in project["_via_img_metadata"].values():
-        creator = MaskCreator(image,args.file_path)
-        creator.start()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=args.max_threads) as thread_pool:
+        thread_pool.map(lambda x:create_mask_for_image(x,args.file_path),project["_via_img_metadata"].values())
+
+    # for image in project["_via_img_metadata"].values():
+    #     creator = MaskCreator(image,args.file_path)
+    #     creator.start()
