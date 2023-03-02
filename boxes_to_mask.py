@@ -4,6 +4,7 @@ import argparse
 import numpy as np
 import cv2
 import concurrent.futures
+import os
 
 #These are hardcoded in as they are not included in the project JSON and they are constant for all images.
 IMAGE_WIDTH = 400#0
@@ -24,11 +25,16 @@ label_colours = {
 
 def create_mask_for_image(image,path):
     filename = image["filename"][:-4] #Remove extension
+    output_file = f"{path}/{filename}_mask.png"
+    #Check if file already exists
+    if os.path.exists(output_file):
+        print(f"File {output_file} already exists")
+        return
+    
     print(f"Creating mask for: {filename}")
     regions = extract_regions_from_json(image)
     paths = regions_to_paths(regions)
     mask = create_mask(paths)
-    output_file = f"{path}/{filename}_mask.png"
     cv2.imwrite(output_file,mask)
     print(f"Mask created and written to {output_file}")
 
