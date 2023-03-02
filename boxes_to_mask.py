@@ -7,8 +7,8 @@ import concurrent.futures
 import os
 
 #These are hardcoded in as they are not included in the project JSON and they are constant for all images.
-IMAGE_WIDTH = 400#0
-IMAGE_HEIGHT = 244#8
+IMAGE_WIDTH = 4000
+IMAGE_HEIGHT = 2448
 
 label_order = [
     "growlers",
