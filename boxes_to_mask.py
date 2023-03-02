@@ -24,7 +24,6 @@ label_colours = {
 def create_mask(paths):
     mask = np.zeros((IMAGE_HEIGHT,IMAGE_WIDTH,3),dtype=np.int64)
     for y in range(IMAGE_HEIGHT):
-        print(y)
         for x in range(IMAGE_WIDTH):
             mask[y,x,:] = label_colours[assign_point_label((x,y),paths)]
     return mask
@@ -52,6 +51,7 @@ def regions_to_paths(regions):
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('json_file')
+    parser.add_argument('file_path')
     args = parser.parse_args()
 
     f = open(args.json_file)
@@ -71,4 +71,6 @@ if __name__=="__main__":
                 regions[label] = [points]
         paths = regions_to_paths(regions)
 
-        cv2.imwrite("mask.png",create_mask(paths))
+        filename = image["filename"][:-4] #Remove extension
+
+        cv2.imwrite(f"{args.file_path}/{filename}_mask.png",create_mask(paths))
