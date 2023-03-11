@@ -20,6 +20,7 @@ label_colours = {
     "glacier": [255,0,0],
     "iceberg": [0,255,0],
     "growlers": [0,0,255],
+    "growler": [0,0,255],
     "0": [0,0,0]
 }
 
@@ -32,45 +33,47 @@ def create_mask_for_image(image,path):
         return
     
     print(f"Creating mask for: {filename}")
-    regions = extract_regions_from_json(image)
+    regions,boxes  = extract_regions_from_json(image)
+    #Quit out if there are no regions in image: impossible to make a mask
+    if len(regions) == 0:
+        return
+    
     paths = regions_to_paths(regions)
-    mask = create_mask(paths)
+    mask = create_mask(paths,boxes)
     cv2.imwrite(output_file,mask)
     print(f"Mask created and written to {output_file}")
 
 def extract_regions_from_json(image_json):
     regions = {}
+    boxes = {}
     for region in image_json["regions"]: 
         label = region["region_attributes"]["class"]
         xs =region["shape_attributes"]["all_points_x"]
         ys = region["shape_attributes"]["all_points_y"]
         points = np.array([[x,y] for x,y in zip(xs,ys)])
+        box = (min(xs)-1,min(ys)-1,max(xs)+1,max(ys)+1)
         if label in regions:
             regions[label].append(points)
+            boxes[label].append(box)
         else:
             regions[label] = [points]
-    return regions
+            boxes[label] = [box]
+    return regions,boxes
 
-def create_mask(paths):
+def create_mask(paths,boxes):
     mask = np.zeros((IMAGE_HEIGHT,IMAGE_WIDTH,3),dtype=np.int64)
-    for y in range(IMAGE_HEIGHT):
-        for x in range(IMAGE_WIDTH):
-            mask[y,x,:] = label_colours[assign_point_label((x,y),paths)]
+    for label in paths.keys():
+        mask = fill_in(mask,label_colours[label],paths[label],boxes[label])
     return mask
 
-def assign_point_label(point,paths):
-    for label in label_order:
-        if label in paths:
-            label_paths = paths[label]
-            if point_in_paths(point,label_paths):
-                return label
-    return "0"
-
-def point_in_paths(point,paths):
-    for path in paths:
-        if path.contains_point(point):
-            return True
-    return False
+def fill_in(mask,colour,paths,boxes):
+    for i,path in enumerate(paths):
+        minx,miny,maxx,maxy = boxes[i]
+        for x in range(minx,maxx+1):
+            for y in range(miny,maxy+1):
+                if path.contains_point((x,y)):
+                    mask[y,x,:] = colour
+    return mask
 
 def regions_to_paths(regions):
     paths = {}
@@ -86,8 +89,11 @@ if __name__=="__main__":
     args = parser.parse_args()
 
     f = open(args.json_file)
-    project = json.load(f)
+    annotations = json.load(f)
     f.close()
 
+    # for a in annotations.values():
+    #     create_mask_for_image(a,args.file_path)
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.max_threads) as thread_pool:
-        thread_pool.map(lambda x:create_mask_for_image(x,args.file_path),project["_via_img_metadata"].values())
+        thread_pool.map(lambda x:create_mask_for_image(x,args.file_path),annotations.values())
