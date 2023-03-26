@@ -13,31 +13,37 @@ IMAGE_WIDTH = 4000
 IMAGE_HEIGHT = 2448
 
 label_order = [
-    "growlers",
+    "sky",
+    "sea",
     "iceberg",
-    "glacier"
+    "glacier",
+    "growlers",
 ]
 
 label_colours = {
-    "glacier": [255,0,0],
+    "glacier": [255,0,255],
     "iceberg": [0,255,0],
     "growlers": [0,0,255],
     "growler": [0,0,255],
+    "sea": [255,0,0],
+    "sky": [255,255,255],
     "0": [0,0,0]
 }
 
 label_layers = {
-    "glacier": [255,0,0,0],
-    "iceberg": [0,255,0,0],
-    "growlers": [0,0,255,0],
-    "growler": [0,0,255,0],
-    "background": [0,0,0,255]
+    "glacier": [255,0,0,0,0,0],
+    "iceberg": [0,255,0,0,0,0],
+    "growlers": [0,0,255,0,0,0],
+    "growler": [0,0,255,0,0,0],
+    "sea": [0,0,0,255,0,0],
+    "sky": [0,0,0,0,255,0],
+    "background": [0,0,0,0,0,255],
 }
 
 def create_mask_for_image(image,mask_dir,image_dir=None,gif=False):
     filename = image["filename"][:-4] #Remove extension
-    extenion = ".png" if not gif else ".gif"
-    output_file = f"{mask_dir}/{filename}_mask.gif"
+    extension = "png" if not gif else "gif"
+    output_file = f"{mask_dir}/{filename}_mask.{extension}"
     #Check if file already exists
     if os.path.exists(output_file):
         print(f"File {output_file} already exists")
@@ -83,18 +89,20 @@ def extract_regions_from_json(image_json,x_scale=1,y_scale=1):
 
 def create_mask(paths,boxes,size):
     mask = np.zeros((size[0],size[1],3),dtype=np.int64)
-    for label in paths.keys():
-        mask = fill_in(mask,label_colours[label],paths[label],boxes[label])
+    for label in label_order:
+        if label in paths:
+            mask = fill_in(mask,label_colours[label],paths[label],boxes[label])
     return mask
 
 def create_mask_gif(paths,boxes,size):
     #A layer is created for each class (3 in paths + background)
     mask = np.concatenate([
-        np.zeros((3,size[0],size[1]),dtype=np.uint8),
+        np.zeros((5,size[0],size[1]),dtype=np.uint8),
         np.full((1,size[0],size[1]),255,dtype=np.uint8)
     ])
-    for label in paths.keys():
-        mask = fill_in_gif(mask,label_layers[label],paths[label],boxes[label])
+    for label in label_order:
+        if label in paths:
+            mask = fill_in_gif(mask,label_layers[label],paths[label],boxes[label])
     return mask
 
 def fill_in(mask,colour,paths,boxes):
@@ -141,8 +149,5 @@ if __name__=="__main__":
     annotations = json.load(f)
     f.close()
 
-    for x in annotations.values():
-        create_mask_for_image(x,args.mask_path,args.image_path,args.gif)        
-
-    # with concurrent.futures.ThreadPoolExecutor(max_workers=args.max_threads) as thread_pool:
-    #     thread_pool.map(lambda x:create_mask_for_image(x,args.mask_path,args.image_path,args.gif),annotations.values())
+    with concurrent.futures.ThreadPoolExecutor(max_workers=args.max_threads) as thread_pool:
+        thread_pool.map(lambda x:create_mask_for_image(x,args.mask_path,args.image_path,args.gif),annotations.values())
