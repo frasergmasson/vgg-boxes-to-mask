@@ -15,8 +15,9 @@ IMAGE_HEIGHT = 2448
 label_order = [
     "sky",
     "sea",
-    "iceberg",
     "glacier",
+    "iceberg",
+    "growler",
     "growlers",
 ]
 
