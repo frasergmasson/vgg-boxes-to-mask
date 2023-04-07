@@ -32,4 +32,4 @@ if __name__=="__main__":
                    if os.path.isfile(os.path.join(args.in_dir,file)) and "JPG" in os.path.splitext(file)[1] ] 
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.max_threads) as thread_pool:
-        thread_pool.map(lambda x:resize_image(x,args.in_dir,args.out_dir,(args.height,args.width)),image_names)
+        thread_pool.map(lambda x:resize_image(x,args.in_dir,args.out_dir,(args.width,args.height)),image_names)
